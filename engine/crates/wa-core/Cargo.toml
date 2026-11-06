@@ -1,0 +1,38 @@
+[package]
+name = "wa-core"
+description = "WhatsApp protocol core: client, socket, binary, store, crypto"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+thiserror.workspace = true
+async-trait.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sqlx.workspace = true
+tokio.workspace = true
+futures.workspace = true
+tokio-tungstenite.workspace = true
+aes.workspace = true
+aes-gcm.workspace = true
+cbc.workspace = true
+hkdf.workspace = true
+tracing.workspace = true
+wa-proto.workspace = true
+prost.workspace = true
+specta.workspace = true
+rand.workspace = true
+curve25519-dalek.workspace = true
+sha2.workspace = true
+hex.workspace = true
+lru.workspace = true
+flate2.workspace = true
+hmac.workspace = true
+tokio-util.workspace = true
+reqwest.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

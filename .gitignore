@@ -1,0 +1,28 @@
+# Rust / engine
+engine/target/
+**/target/
+
+# Node / client
+node_modules/
+client/node_modules/
+client/dist/
+client/out-tsc/
+client/coverage/
+client/.angular/
+client/src-tauri/gen/
+client/src-tauri/target/
+# Sidecar binaries (copied by scripts/copy-sidecar.mjs)
+client/src-tauri/binaries/bebok-server-*
+
+# Local data / testing
+.bebok/
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp

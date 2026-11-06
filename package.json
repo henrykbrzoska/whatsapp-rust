@@ -1,0 +1,27 @@
+{
+  "name": "ngwhatsapp",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local WhatsApp client \u2014 Angular + Tauri 2 + Rust engine",
+  "author": "Henryk Brzoska",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "doctor": "node scripts/bebok.mjs doctor",
+    "engine": "node scripts/bebok.mjs engine",
+    "client": "node scripts/bebok.mjs client",
+    "full-build-dev": "node scripts/bebok.mjs full-build-dev",
+    "full-build-app": "node scripts/bebok.mjs full-build-app",
+    "sidecar:copy": "node scripts/copy-sidecar.mjs",
+    "release": "node scripts/release.mjs",
+    "release:checksums": "node scripts/release.mjs checksums",
+    "e2e": "npm --prefix e2e test",
+    "e2e:install": "npm --prefix e2e install && npm --prefix e2e exec playwright install chromium",
+    "test": "npm run test:engine && npm run test:client",
+    "test:engine": "cargo test --workspace --manifest-path engine/Cargo.toml",
+    "test:client": "npm --prefix client test",
+    "specta": "cargo run -q --manifest-path engine/Cargo.toml -p bebok-server --bin export-types"
+  }
+}

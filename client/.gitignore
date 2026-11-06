@@ -1,0 +1,8 @@
+node_modules/
+dist/
+out-tsc/
+coverage/
+.angular/
+src-tauri/target/
+src-tauri/gen/
+src-tauri/binaries/bebok-server-*

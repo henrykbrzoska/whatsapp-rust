@@ -1,0 +1,42 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "ngWhatsapp",
+  "version": "0.1.0",
+  "identifier": "dev.bebok.ngwhatsapp",
+  "build": {
+    "beforeDevCommand": "npm run start",
+    "devUrl": "http://localhost:4200",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist/client/browser"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "ngWhatsapp",
+        "width": 1100,
+        "height": 760,
+        "minWidth": 640,
+        "minHeight": 480
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; connect-src 'self' ipc: http://ipc.localhost http://127.0.0.1:* http://localhost:* https://api.qrserver.com; img-src 'self' data: blob: https://api.qrserver.com; style-src 'self' 'unsafe-inline' data: blob:; font-src 'self' data:; script-src 'self' 'unsafe-inline' 'unsafe-eval'"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "publisher": "Henryk Brzoska",
+    "copyright": "© 2026 Henryk Brzoska",
+    "externalBin": [
+      "binaries/bebok-server"
+    ],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/icon.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
+  }
+}

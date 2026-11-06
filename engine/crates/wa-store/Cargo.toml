@@ -1,0 +1,25 @@
+[package]
+name = "wa-store"
+description = "Local chat database: SQLite + FTS5 + sqlite-vec (hybrid search, history export)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[features]
+default = []
+# Real MiniLM embeddings via fastembed/ONNX (downloads ~80 MB model on first use).
+fastembed = ["dep:fastembed"]
+
+[dependencies]
+anyhow.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+rusqlite.workspace = true
+sqlite-vec.workspace = true
+tracing.workspace = true
+fastembed = { version = "4", optional = true }
+specta.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

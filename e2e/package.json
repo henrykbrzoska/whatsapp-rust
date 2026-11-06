@@ -1,0 +1,19 @@
+{
+  "name": "ngwhatsapp-e2e",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Playwright E2E against the mock engine (API-WHATSAPP.md contract)",
+  "type": "module",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:ui": "playwright test --ui",
+    "report": "playwright show-report",
+    "install:browsers": "playwright install chromium",
+    "mock": "node mock-engine.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.60.0",
+    "@types/node": "^22.10.0"
+  }
+}
