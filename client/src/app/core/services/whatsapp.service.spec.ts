@@ -119,6 +119,34 @@ describe('WhatsappService', () => {
     expect(wa.connectionState()).toBe('disconnected');
   });
 
+  it('does not fight a session another instance took over (conflict type=replaced)', async () => {
+    const deps = engineWith({
+      state: 'disconnected',
+      connected: false,
+      loggedIn: true,
+      error: 'another session took over this device (conflict type=replaced)',
+      attempts: 1,
+      replaced: true,
+    });
+    const { wa } = setup(deps);
+    await wa.start();
+
+    // Reconnecting here would kick the other engine, which would kick us back.
+    expect(deps.fetchSpy.calls.all().some((c) => String(c.args[0]).includes('/connect'))).toBeFalse();
+    expect(wa.connectionState()).toBe('disconnected');
+    expect(wa.engineError()).toContain('conflict type=replaced');
+  });
+
+  it('says why the socket closed when another login replaced this session', () => {
+    const deps = engineWith({ state: 'connected', connected: true, loggedIn: true, error: null, attempts: 1 });
+    const { wa } = setup(deps);
+
+    wa.handleEvent({ type: 'stream_replaced' });
+
+    expect(wa.connectionState()).toBe('disconnected');
+    expect(wa.engineError()).toContain('took over this device');
+  });
+
   it('sends a message and reads one page of a thread', async () => {
     const deps = configured();
     const { wa } = setup(deps);

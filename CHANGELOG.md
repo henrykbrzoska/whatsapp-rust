@@ -4,6 +4,34 @@ All notable changes to this project. Format inspired by Bebok and Keep a Changel
 
 ## Unreleased
 
+### A taken-over session is reported instead of silently going "disconnected"
+
+Two engines sharing one device (a copied `<data-dir>`) do not run side by side:
+the second login makes WhatsApp close the first socket with
+`conflict type=replaced`. `wa-core` already emitted `StreamReplaced`, but the
+engine never folded it into its session state — `/status` said `disconnected`
+with `error: null`, and the client's `resumeSession()` promptly reconnected,
+kicking the other instance, which reconnected in turn. Endless ping-pong.
+
+#### Fixed
+
+- `Connection::apply_event` / `note_event` (`bebok-server/src/connection.rs`)
+  fold the client's terminal events into the session state: `stream_replaced`
+  keeps the reason in `error`, `stream_error` keeps its code, `logged_out`
+  moves to `logged_out`, `connected` clears both.
+- `GET /status` / `POST /connect` now answer `replaced: true` while a session is
+  hijacked by another login; an explicit connect clears it (the user may well be
+  the one taking the device back).
+- `WhatsappService.resumeSession()` skips the automatic `POST /connect` when
+  `replaced` is set, and `stream_replaced` surfaces the reason in
+  `engineError()` instead of a bare `disconnected`.
+
+#### Docs
+
+- `README.md` §"One device, many windows": many clients attach to **one** engine
+  (SSE fan-out), copying `<data-dir>` moves the device instead of adding a
+  linked one, and the 4-linked-devices limit lives on WhatsApp's servers.
+
 ### Sending reached one device (own devices dropped out of the fan-out)
 
 A sent DM went out with a single `<to>` — the recipient's device — and none

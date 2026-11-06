@@ -1,5 +1,10 @@
 //! Routing table — every HTTP endpoint the engine exposes, in one place.
 //!
+//! Handlers return `Result<_, axum::response::Response>`; `Response` is a big
+//! `Err` variant by construction, so the `result_large_err` lint is silenced
+//! for this module (the alternative — boxing every error — buys nothing here).
+#![allow(clippy::result_large_err)]
+//!
 //! | Method | Path                               | Handler                     |
 //! |--------|------------------------------------|-----------------------------|
 //! | GET    | `/`                                | [`root`] (handshake)        |

@@ -109,6 +109,33 @@ More in `AGENTS.md` §5.
 
 Without Tauri: engine on `:8787` + `ng serve` on `:4200`. On startup the client reads `?engine=<url-encoded BEBOK_READY>` (URL + token), stores it like a manual Connect, clears the address bar and talks to the engine with `Authorization: Bearer`. SSE (`GET /events`) replaces Tauri events.
 
+## One device, many windows
+
+A device is *one* identity (keys in `<data-dir>/wa-core.db`), and WhatsApp keeps
+**one live socket per device**. So "two WhatsApp windows" is done by attaching
+two clients to **one** engine — never by running two engines with the same keys:
+
+```bash
+cd engine && cargo run -- --host 0.0.0.0 --port 8787   # one engine, one device
+# then open the printed BEBOK_READY URL in as many windows/machines as you like
+# (add the other origin to BEBOK_CORS, e.g. BEBOK_CORS=http://192.168.1.5:4200)
+```
+
+Every attached client sees the same session: `GET /events` (SSE) is a
+`broadcast` channel, so all subscribers get every message, and `POST /connect`
+is a no-op while a session is live.
+
+Two engines with the *same* keys fight: the second login makes WhatsApp close
+the first socket with `conflict type=replaced`. The engine reports that as
+`replaced: true` in `GET /status` (plus an `error` that says why) and the client
+stops auto-reconnecting — otherwise the two would steal the session back and
+forth forever. Only an explicit Connect reclaims the device.
+
+Copying `<data-dir>` (the `wa-core.db` keys, `wa-store.db`, `models/`) moves the
+device to another machine — stop the engine first. It does **not** add a linked
+device: the 4-linked-devices limit belongs to the account on WhatsApp's servers,
+so only unlink/reset on the phone frees a slot.
+
 ## Security
 
 * Per-launch capability token, `Authorization: Bearer` or `?token=`

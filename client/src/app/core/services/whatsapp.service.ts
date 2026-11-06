@@ -33,6 +33,13 @@ export interface EngineSessionStatus {
   loggedIn: boolean;
   error: string | null;
   attempts: number;
+  /**
+   * WhatsApp closed the socket because another login took the device over
+   * (`conflict type=replaced`). Never auto-reconnect then: two engines sharing
+   * one device would kick each other forever — only an explicit Connect may
+   * take the session back.
+   */
+  replaced?: boolean;
 }
 
 /** `POST /presence/send` — Go `types.Presence`. */
@@ -296,7 +303,7 @@ export class WhatsappService {
       return;
     }
     this.applyStatus(status);
-    if (status.loggedIn && !status.connected && status.state !== 'connecting') {
+    if (status.loggedIn && !status.connected && !status.replaced && status.state !== 'connecting') {
       try {
         await this.connect();
       } catch (e) {
@@ -308,6 +315,16 @@ export class WhatsappService {
   /** Map `GET /status` onto `connectionState` / `paired`. */
   applyStatus(status: EngineSessionStatus): void {
     this.paired.set(status.loggedIn);
+    // A takeover is a terminal state for this window: the engine reports why,
+    // and `resumeSession` refuses to grab the session back on its own.
+    if (status.replaced) {
+      this.connectionState.set('disconnected');
+      this.engineError.set(status.error ?? 'another session took over this device');
+      return;
+    }
+    if (status.error) {
+      this.engineError.set(status.error);
+    }
     if (status.connected) {
       this.connectionState.set('connected');
       return;
@@ -385,10 +402,17 @@ export class WhatsappService {
         this.connectionState.set('connected');
         break;
       case 'disconnected':
-      case 'stream_replaced':
       case 'connect_failure':
         this.connectionState.set('disconnected');
         this.historySyncing.set(false);
+        break;
+      case 'stream_replaced':
+        // Another login took the device over (`conflict type=replaced`). Show
+        // it, and leave reconnecting to an explicit Connect — the engine will
+        // not retry either (see `ConnectionStatus.replaced`).
+        this.connectionState.set('disconnected');
+        this.historySyncing.set(false);
+        this.engineError.set('another session took over this device — connect manually to take it back');
         break;
       case 'logged_out':
         this.qrCodes.set([]);

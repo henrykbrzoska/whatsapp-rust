@@ -135,7 +135,7 @@ type NewsletterMessageData = {    // Go types.NewsletterMessage
 
 | Tauri command | HTTP | Description |
 |---|---|---|
-| `connect()` | `POST /connect` ✅ (handshake only) | Starts the session and returns the state at once: the dial + Noise handshake run in the background, so the request never waits for the QR flow. Answers `{ state, connected, loggedIn, error, attempts }` (`API-WHATSAPP.md` §2 events report progress: `connected` / `connect_failure`). A second call while a session exists is a no-op. |
+| `connect()` | `POST /connect` ✅ (handshake only) | Starts the session and returns the state at once: the dial + Noise handshake run in the background, so the request never waits for the QR flow. Answers `{ state, connected, loggedIn, error, attempts, replaced }` (`API-WHATSAPP.md` §2 events report progress: `connected` / `connect_failure`). A second call while a session exists is a no-op. `replaced: true` means WhatsApp closed this socket because another login took the device over (`conflict type=replaced`); `error` carries the reason and clients must not auto-reconnect until the user connects explicitly. |
 | `disconnect()` | `POST /disconnect` 🚧 | `Client::Disconnect()` — closes the WS, does not emit `disconnected` |
 | `is_connected(): bool` | `GET /connected` ✅ | `Client::IsConnected()` — `true` once the Noise handshake completed |
 | `is_logged_in(): bool` | `GET /logged_in` ✅ | `Client::IsLoggedIn()` — `true` when the store holds a paired device (`device_jids` non-empty) |

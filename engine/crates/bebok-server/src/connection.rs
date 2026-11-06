@@ -57,7 +57,18 @@ pub struct ConnectionStatus {
     pub error: Option<String>,
     /// How many connection attempts were started (`0` before the first one).
     pub attempts: u64,
+    /// WhatsApp closed the socket because *another* session logged in with this
+    /// device's keys (`conflict type=replaced`). A client must not auto-reconnect
+    /// then: two engines sharing one identity would kick each other in a loop.
+    /// Cleared by an explicit `POST /connect`.
+    pub replaced: bool,
 }
+
+/// Why a `replaced` disconnect happened — shown in the UI, because "disconnected"
+/// alone cannot tell a takeover from a network blip.
+pub const REPLACED_ERROR: &str = "another session took over this device's connection (WhatsApp closed it with \
+                                  conflict type=replaced); only one engine can be online per device — sign out of \
+                                  the other instance or give it a different data directory";
 
 /// Why `POST /logout` failed.
 #[derive(Debug)]
@@ -75,6 +86,8 @@ struct Inner {
     attempts: u64,
     /// The device was paired when last checked (`device.id.is_some()`).
     paired: bool,
+    /// The session was taken over by another login (`conflict type=replaced`).
+    replaced: bool,
 }
 
 /// The engine's single connection handle.
@@ -97,6 +110,7 @@ impl Connection {
                 error: None,
                 attempts: 0,
                 paired: false,
+                replaced: false,
             })),
             client: Arc::new(RwLock::new(None)),
             app: Arc::new(OnceLock::new()),
@@ -154,6 +168,71 @@ impl Connection {
             logged_in: inner.paired,
             error: inner.error.clone(),
             attempts: inner.attempts,
+            replaced: inner.replaced,
+        }
+    }
+
+    /// Fold one client event into the reported session state.
+    ///
+    /// `error` is what the window displays, so a server-side kick must leave an
+    /// explanation behind; and a `replaced` kick must clear auto-reconnect (see
+    /// [`ConnectionStatus::replaced`]) or the loser of a two-engine setup would
+    /// immediately steal the session back, forever.
+    pub async fn apply_event(&self, ev: &WaEvent) {
+        let mut inner = self.inner.lock().await;
+        match ev {
+            WaEvent::Connected => {
+                inner.state = ConnectionState::Connected;
+                inner.error = None;
+                inner.replaced = false;
+            }
+            WaEvent::Disconnected => {
+                if inner.state == ConnectionState::Connected {
+                    inner.state = ConnectionState::Disconnected;
+                }
+            }
+            WaEvent::StreamReplaced => {
+                inner.state = ConnectionState::Disconnected;
+                inner.error = Some(REPLACED_ERROR.to_owned());
+                inner.replaced = true;
+            }
+            WaEvent::StreamError { code } => {
+                inner.state = ConnectionState::Disconnected;
+                inner.error = Some(format!("the server closed the connection with stream error {code}"));
+            }
+            WaEvent::LoggedOut { .. } => {
+                inner.state = ConnectionState::LoggedOut;
+                inner.error = None;
+                inner.paired = false;
+                inner.replaced = false;
+            }
+            WaEvent::ConnectFailure { message, .. } => {
+                inner.state = ConnectionState::Disconnected;
+                inner.error = Some(message.clone());
+            }
+            _ => {}
+        }
+    }
+
+    /// Sync adapter for the client's [`EventSink`](wa_core::client::EventSink),
+    /// which cannot await: the state update is handed to the runtime. Events
+    /// that do not change the session state are dropped without a task.
+    pub fn note_event(&self, ev: &WaEvent) {
+        let ev = match ev {
+            WaEvent::Connected
+            | WaEvent::Disconnected
+            | WaEvent::StreamReplaced
+            | WaEvent::StreamError { .. }
+            | WaEvent::LoggedOut { .. }
+            | WaEvent::ConnectFailure { .. } => ev.clone(),
+            _ => return,
+        };
+        let this = self.clone();
+        match tokio::runtime::Handle::try_current() {
+            Ok(handle) => {
+                handle.spawn(async move { this.apply_event(&ev).await });
+            }
+            Err(_) => tracing::debug!("no tokio runtime; the session state was not updated"),
         }
     }
 
@@ -194,6 +273,9 @@ impl Connection {
             inner.state = ConnectionState::Connecting;
             inner.error = None;
             inner.attempts += 1;
+            // An explicit connect is the user's decision — it may well be the
+            // session that takes the device back from another instance.
+            inner.replaced = false;
         }
 
         let Some(app) = self.app() else {
@@ -330,12 +412,15 @@ pub fn event_sink(app: &SharedState) -> wa_core::client::EventSink {
         if let Some(row) = stored_from_event(&ev) {
             persist_message(&store, row);
         }
-        // `<success>`: pull the address book and the chat flags, which is what
-        // turns raw JIDs into names (see `crate::appstate_sync`).
-        if matches!(ev, WaEvent::Connected)
-            && let Some(app) = weak.upgrade()
-        {
-            crate::appstate_sync::spawn_after_connect(&app);
+        if let Some(app) = weak.upgrade() {
+            // A takeover (`conflict type=replaced`) must leave a reason behind
+            // and disable auto-reconnect — see `Connection::apply_event`.
+            app.connection.note_event(&ev);
+            // `<success>`: pull the address book and the chat flags, which is
+            // what turns raw JIDs into names (see `crate::appstate_sync`).
+            if matches!(ev, WaEvent::Connected) {
+                crate::appstate_sync::spawn_after_connect(&app);
+            }
         }
         let _ = events.send(ev);
     })
@@ -470,8 +555,14 @@ mod tests {
 
     #[test]
     fn status_uses_the_documented_json_keys() {
-        let status =
-            ConnectionStatus { state: "connected".into(), connected: true, logged_in: false, error: None, attempts: 2 };
+        let status = ConnectionStatus {
+            state: "connected".into(),
+            connected: true,
+            logged_in: false,
+            error: None,
+            attempts: 2,
+            replaced: false,
+        };
         assert_eq!(
             serde_json::to_value(&status).unwrap(),
             serde_json::json!({
@@ -480,8 +571,62 @@ mod tests {
                 "loggedIn": false,
                 "error": null,
                 "attempts": 2,
+                "replaced": false,
             })
         );
+    }
+
+    #[tokio::test]
+    async fn a_takeover_by_another_session_is_reported_and_not_retried() {
+        let connection = Connection::new();
+        connection.apply_event(&WaEvent::Connected).await;
+        let status = connection.status().await;
+        assert!(!status.replaced && status.error.is_none(), "got {status:?}");
+
+        // A second engine logged in with the same keys.
+        connection.apply_event(&WaEvent::StreamReplaced).await;
+        let status = connection.status().await;
+        assert_eq!(status.state, "disconnected");
+        assert!(status.replaced, "the UI must not auto-reconnect after a takeover");
+        assert!(status.error.as_deref().is_some_and(|e| e.contains("replaced")), "got {status:?}");
+
+        // An explicit connect is allowed to take the device back.
+        connection.apply_event(&WaEvent::Connected).await;
+        let status = connection.status().await;
+        assert!(!status.replaced);
+        assert_eq!(status.error, None);
+    }
+
+    #[tokio::test]
+    async fn stream_errors_and_logout_update_the_state() {
+        let connection = Connection::new();
+        connection.apply_event(&WaEvent::StreamError { code: "500".into() }).await;
+        let status = connection.status().await;
+        assert_eq!(status.state, "disconnected");
+        assert!(status.error.as_deref().is_some_and(|e| e.contains("500")), "got {status:?}");
+
+        connection.apply_event(&WaEvent::LoggedOut { on_connect: false, reason: 401 }).await;
+        assert_eq!(connection.status().await.state, "logged_out");
+    }
+
+    #[tokio::test]
+    async fn a_plain_disconnect_keeps_the_last_error() {
+        let connection = Connection::new();
+        connection.apply_event(&WaEvent::ConnectFailure { reason: 0, message: "boom".into() }).await;
+        connection.apply_event(&WaEvent::Disconnected).await;
+        let status = connection.status().await;
+        assert_eq!(status.state, "disconnected");
+        assert_eq!(status.error.as_deref(), Some("boom"));
+    }
+
+    #[test]
+    fn note_event_outside_a_runtime_does_not_panic() {
+        let connection = Connection::new();
+        // The `EventSink` contract is sync; without a runtime the update is
+        // dropped rather than panicking on `Handle::current`.
+        connection.note_event(&WaEvent::StreamReplaced);
+        // An event that cannot change the session state is a no-op as well.
+        connection.note_event(&WaEvent::KeepAliveRestored);
     }
 
     #[tokio::test]
