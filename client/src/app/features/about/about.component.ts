@@ -76,7 +76,7 @@ export function libraryStats(entries: readonly ChatListEntry[]): LibraryStats {
         <p class="muted">Connect to an engine to see the local library size.</p>
       }
 
-      <p class="muted">Third-party licenses: see <code>THIRD_PARTY_NOTICES.md</code>.</p>
+      <p class="muted">No third-party source files are vendored in this repository.</p>
     </section>
   `,
 })

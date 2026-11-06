@@ -2,10 +2,11 @@
 
 ## 1. Goal
 
-Port whatsmeow (Go) to Rust
-as the engine for an Angular + Tauri 2 client. Keep WA Web semantics
-(WebSocket + Noise + Signal + AppState + store), swap the Go runtime for Tokio
-and expose the UI in two modes: desktop (Tauri) and browser (ng serve + engine).
+WhatsApp Web semantics (WebSocket + Noise + Signal + AppState + store)
+implemented in Rust as the engine for an Angular + Tauri 2 client. Protocol
+behaviour is inspired by whatsmeow (Go) — no files from that repository are
+vendored in this repo. The Go runtime is replaced by Tokio and the UI is
+exposed in two modes: desktop (Tauri) and browser (ng serve + engine).
 The application language is English.
 
 ## 2. High-level diagram
@@ -190,7 +191,7 @@ client/
 
 Requirement: a lightweight database from the start, fast local search (keyword + vector), and a "Download full chat history" button.
 
-* **Engine:** SQLite (same data dir as `whatsmeow`), extended with **FTS5** (keyword) and **sqlite-vec** (`vec0` virtual table, cosine) — no separate vector server. Alternatives: `sqlite-vss`/`usearch`, but `sqlite-vec` is the lightest and ships prebuilt for `rusqlite`.
+* **Engine:** SQLite (local data dir, e.g. `.bebok/` / OS app-data), extended with **FTS5** (keyword) and **sqlite-vec** (`vec0` virtual table, cosine) — no separate vector server. Alternatives: `sqlite-vss`/`usearch`, but `sqlite-vec` is the lightest and ships prebuilt for `rusqlite`.
 * **Crate:** `engine/crates/wa-store/` (next to `wa-core`) — `rusqlite` + `sqlite-vec` + `fastembed` (ONNX `all-MiniLM-L6-v2`, 384d, ~80 MB model, cached in `.bebok/models/`), behind the `fastembed` cargo feature. Embeddings are computed in Rust (tokio `spawn_blocking`), offline. Fallback: FTS5 only when no embedder is available (`hybrid` == `keyword`).
 * **Schema:**
   ```sql

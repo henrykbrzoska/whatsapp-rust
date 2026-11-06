@@ -3,7 +3,7 @@
 Author: **Henryk Brzoska**
 
 A local WhatsApp client — **Angular (standalone, signals) + Tauri 2 + Rust engine**.
-The protocol core lives in `engine/crates/wa-core/`. Protocol reference: whatsmeow (Go, MPL-2.0) — see `THIRD_PARTY_NOTICES.md`.
+The protocol core lives in `engine/crates/wa-core/`. Protocol behaviour is inspired by whatsmeow (Go) — no files from that repository are vendored in this repo.
 The frontend runs in two modes: **desktop (Tauri WebView)** and **browser (ng serve + engine on localhost)**.
 
 > Status: Phase 2 complete — transport + Noise handshake + local store; the QR/session state machine is Phase 3. The Rust engine core is in `engine/crates/wa-core/`. See `ARCHITECTURE.md`, `API-WHATSAPP.md`, `TODO.md`.
@@ -145,7 +145,7 @@ so only unlink/reset on the phone frees a slot.
 
 ## License
 
-Protocol code ported from whatsmeow (Go, MPL-2.0) — see `THIRD_PARTY_NOTICES.md`. Port and client code — see `LICENSE` (once added).
+No third-party source files are vendored in this repository. Protocol behaviour is inspired by whatsmeow (Go) — see `ARCHITECTURE.md` §1. Port and client code — see `LICENSE` (once added).
 
 ## See also
 

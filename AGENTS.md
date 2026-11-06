@@ -15,7 +15,7 @@ the frontend only renders and sends input. It runs in two modes:
 **Language: English.** The application UI, code identifiers, comments, log messages,
 test fixtures and all docs are in English. Do not add i18n unless asked.
 
-Protocol source: whatsmeow (Go) — protocol behaviour ported file by file, see `THIRD_PARTY_NOTICES.md`.
+Protocol behaviour is inspired by whatsmeow (Go) — no files from that repository are vendored in this repo.
 Rust port: `engine/crates/wa-core/` — see `ARCHITECTURE.md` and `API-WHATSAPP.md`.
 
 Reading order: `README.md` → `ARCHITECTURE.md` → `API-WHATSAPP.md` → this file → `TODO.md` → code:
