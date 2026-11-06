@@ -2,7 +2,8 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [master]
+    tags: ['v*']
   pull_request:
 
 concurrency:
@@ -25,8 +26,6 @@ jobs:
         working-directory: engine
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: recursive
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
@@ -68,3 +67,71 @@ jobs:
         run: npx ng build
       - name: npm test (Karma, ChromeHeadless)
         run: npm test
+
+  release:
+    name: bundle (${{ matrix.os }})
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: engine
+          shared-key: release
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+      - name: Linux webkit deps (Tauri)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file \
+            libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
+      - name: npm ci (client)
+        run: npm ci
+        working-directory: client
+      - name: engine release build
+        run: cargo build --release -p bebok-server
+        working-directory: engine
+      - name: copy sidecar
+        run: node scripts/copy-sidecar.mjs --profile release
+      - name: tauri build
+        run: npm run tauri:build -- --ci
+        working-directory: client
+      - name: SHA256SUMS.txt
+        run: node scripts/release.mjs checksums
+      - name: upload bundles
+        uses: actions/upload-artifact@v4
+        with:
+          name: bundles-${{ runner.os }}
+          path: client/src-tauri/target/release/bundle/**/*
+          if-no-files-found: error
+
+  publish:
+    name: publish release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: bundles-*
+          path: bundles
+      - name: rename checksums per OS
+        run: |
+          for d in bundles/bundles-*/; do
+            os=$(basename "$d" | sed 's/^bundles-//')
+            if [ -f "$d/SHA256SUMS.txt" ]; then
+              mv "$d/SHA256SUMS.txt" "$d/SHA256SUMS-$os.txt"
+            fi
+          done
+          find bundles -type f | sort
+      - name: attach to GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: bundles/**/*
