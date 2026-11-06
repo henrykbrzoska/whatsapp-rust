@@ -192,7 +192,7 @@ impl ExpandedAppStateKeys {
             &mut keys.patch_mac,
         ]
         .into_iter()
-        .zip(expanded.chunks_exact(APP_STATE_KEY_LEN))
+        .zip(expanded.chunks(APP_STATE_KEY_LEN))
         {
             slot.copy_from_slice(chunk);
         }

@@ -124,7 +124,7 @@ fn check_len(base_len: usize, item_len: usize) -> Result<(), AppStateError> {
 /// `performPointwiseWithOverflow` — lane-wise `u16` add/subtract on the
 /// little-endian buffer, wrapping modulo 2^16 like Go's unsigned arithmetic.
 fn perform_pointwise_with_overflow(base: &mut [u8], input: &[u8], op: LtHashOp) {
-    for (base_lane, input_lane) in base.chunks_exact_mut(2).zip(input.chunks_exact(2)) {
+    for (base_lane, input_lane) in base.chunks_mut(2).zip(input.chunks(2)) {
         let x = u16::from_le_bytes([base_lane[0], base_lane[1]]);
         let y = u16::from_le_bytes([input_lane[0], input_lane[1]]);
         let result = match op {
