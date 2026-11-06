@@ -21,8 +21,11 @@ fn collect(dir: &Path, out: &mut Vec<PathBuf>) {
 
 fn main() {
     let manifest = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap());
+    // NOTE: no `canonicalize()` here — on Windows it yields `\\?\`-prefixed
+    // verbatim paths that the vendored `protoc` cannot open. `CARGO_MANIFEST_DIR`
+    // is already absolute, so the joined path works as-is on every OS.
     let root = manifest.join("proto");
-    let root = root.canonicalize().expect("wa-proto/proto not found");
+    assert!(root.is_dir(), "wa-proto/proto not found");
 
     let mut protos = Vec::new();
     collect(&root, &mut protos);
